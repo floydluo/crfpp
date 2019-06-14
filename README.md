@@ -1,4 +1,4 @@
-#. New Python Wrapper Toolkit for CRF++
+# New Python Wrapper Toolkit for CRF++
 
 ## 1. Set up and Run the Demo
 
