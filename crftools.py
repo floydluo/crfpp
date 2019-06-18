@@ -1,13 +1,23 @@
 # UPDATE: 2018/03/14, Add concise argument.
 # UPDATE: 2018/05/04, For Linxu.
 
-
+import numpy as np
 import pandas as pd
 from io import StringIO
 
-
 console_encoding = 'gb2312'
 file_encoding = 'utf-8'
+
+
+def load_anno(channel_anno, tagScheme, BasicObject):
+    # channel_anno = 'annoE'
+    GU = BasicObject.getGrainUnique(channel_anno, tagScheme = tagScheme)
+    list_annoE = GU[0]
+    tag_size = len(list_annoE)
+    label_list = list(set([i.split('-')[0] for i in list_annoE if '-' in i]))
+    label_list.sort()
+    return channel_anno, tagScheme, tag_size, list_annoE, label_list
+
 
 def dict2list(paramdict):
     resultlist = []
@@ -35,7 +45,8 @@ def shell_invoke(args, sinput = None, soutput = None):
 
 def crf_learn(train_data_path, model_path,
               template_path  = 'template/template01',
-              crf_learn_path = 'crftools/crf_learn'):
+              crf_learn_path = 'crftools/crf_learn',
+              params = {}):
     '''
     Use train data from `train_data_path` to learn a model and save the model to `model_path`
     You may need to specify template_path or crf_learn_path
@@ -48,7 +59,6 @@ def crf_learn(train_data_path, model_path,
         shell_invoke([crf_learn_path] + part_args)
     except:
         shell_invoke(['crf_learn'] + part_args)
-
 
 def crf_test(test_data_path, model_path, result_path, 
              concise = True, crf_test_path = 'crftools/crf_test'):
@@ -74,28 +84,82 @@ def crf_test(test_data_path, model_path, result_path,
 
 
 # Dev in 2019/06/14
-
-
-def crfpp_train(sents, model_path, template_path = 'template/template01'):
-    # create para
-    para = []
-    # create template_path
-    # create sentence input feats
-    sentence_with_feats = sent
-
-    feats_data_path   = 'tmp/_crfpp_train_feats.txt'
-
-    crf_learn(feats_data_path, model_path,
-              template_path  = template_path)
+##############################################################################
+def get_sent_strfeats(sent, Channel_Settings, train = True):
+    '''
+        sent is a nlptex.sentence object
+        return a pandas dataframe
+    '''
+    features = {}
+    # stroke 12 and subcomp 6 are fixed internally.
+    for ch, cs in Channel_Settings.items():
+        # print(ch)
+        if 'anno' in ch and not train:
+            continue
+        
+        feature = sent.getChannelGrain(ch)
+        # this will cost a lot of time
+        if ch == 'stroke':
+            max_leng = 12
+            feature2 = []
+            for token_feat in feature:
+                if len(token_feat) <= max_leng:
+                    feature2.append(token_feat + ['</'] * (max_leng - len(token_feat))) 
+                else:
+                    feature2.append(token_feat[:max_leng])
+            feature = feature2
+        elif ch == 'subcomp':
+            max_leng = 6
+            feature2 = []
+            for token_feat in feature:
+                if len(token_feat) <= max_leng:
+                    feature2.append(token_feat + ['</'] * (max_leng - len(token_feat)))
+                else:
+                    feature2.append(token_feat[:max_leng])
+            feature = feature2 
+            
+        
+        features[ch] = feature
+        # print(feature)
+    L = []
+    for ch, feat in features.items():
+        L.append(pd.DataFrame(feat))
     
-    return para 
+    Feats = pd.concat(L, axis = 1)
+    return Feats
 
+def generate_template(gram_1 = 20, path = '_tmp/template'):
+    L = ['# Unigram\n\n']
+    for idx in range(gram_1):
+        L.append('U'  + str(idx) + ':%x[0,' + str(idx) + ']\n')
+        
+    L.append('\n\n')
+    L.append('# Bigram\nB')
+    with open(path, 'w') as f:
+        f.write(''.join(L))
+    return ''.join(L)
+
+def crfpp_train(sents, Channel_Settings, model_path, ):
+    # create para
+    feats_data_path = '_tmp/_crfpp_train_feats.txt'
+    template_path   = '_tmp/_template'
+    DFtrain = pd.DataFrame()
+    for sent in sents:
+        df = get_sent_strfeats(sent, Channel_Settings) #
+        df.loc[len(df)] = np.NaN     ## Trick Here
+        DFtrain = DFtrain.append(df) ## Trick Here
+    DFtrain = DFtrain.reset_index(drop=True)
+    DFtrain.to_csv(feats_data_path, sep = '\t', encoding = 'utf=8', header = False, index = False )
+
+    generate_template(gram_1 = DFtrain.shape[1] - 1, path = template_path)
+    crf_learn(feats_data_path, model_path, template_path  = template_path)
+    # return para 
+##############################################################################
 
 def read_result(result_path):
     result = pd.read_csv(result_path, sep = '\t', header = None, skip_blank_lines=False)
     # get the last column of the result
-    return tag_seq[-1].values
-
+    return result.iloc[:,-1].dropna().values
 
 def extractSET(tag_seq, exist_SE = False):
     '''
@@ -121,33 +185,39 @@ def extractSET(tag_seq, exist_SE = False):
     return entitiesList
 
 
+def get_sent_annoSET(sent, channel = 'annoE', tagScheme = 'BIOES'):
+    anno_seq = [i[0] for i in sent.getChannelGrain(channel, tagScheme=tagScheme)]
+    anno_SET = extractSET(anno_seq)
+    return anno_SET
 
-def tagger(sent, model_path, para = None):
+
+
+def tagger(sent, model_path, Channel_Settings = None):
     '''
         basically from crf_test
         sent: a sentence, could be without annotation
     '''
-    # 0. get para
-    if not para:
-        para = [] 
     # 1. get sentence feats
     # hopefully, the model_config is included in model_path
+
+    feats_data_path   = '_tmp/_tagger_feats.txt'
+    results_data_path = '_tmp/_tagger_results.txt'
+
     sentence_with_feats = sent
-
+    df = get_sent_strfeats(sent, Channel_Settings, train = False)
+    df.to_csv(feats_data_path, sep = '\t', encoding = 'utf=8', header = False, index = False )
     # 2. save the sentence feats to a file
-    feats_data_path   = 'tmp/_tagger_feats.txt'
-    results_data_path = 'tmp/_tagger_results.txt'
-
+    
     # 3. tag a sentence
     crf_test(feats_data_path, model_path, results_data_path)
 
     # 4. read and parse the result to pred_SSET
     # get a tag_seq
     # list of tuple (score, result)
-    tag_seq = read_result(result_path)
+    tag_seq = read_result(results_data_path)
     pred_SET = extractSET(tag_seq)
+    return pred_SET
 
-    return pred_SSET
 
 def match_anno_pred_result(anno_entities, pred_entities, label_list = []):
     if type(anno_entities[0]) != list:
@@ -180,7 +250,7 @@ def match_anno_pred_result(anno_entities, pred_entities, label_list = []):
     return Result
 
 def calculate_F1_Score(Result, label_list):
-    Result = Result.to_dict()
+    Result = Result.sum().to_dict()
     List = []
     entitiesLabel = label_list + ['E']
     # entitiesLabel = ['Sy','Bo', 'Ch', 'Tr', 'Si'] + ['R'] + ['E']
@@ -195,30 +265,28 @@ def calculate_F1_Score(Result, label_list):
     R = pd.DataFrame(List)
     R.set_index('id', inplace = True)
     R.index.name = None
-
+    # print(R)
     R['R'] = R['Match']/R['Anno']
     R['P'] = R['Match']/R['Pred']
     R['F1'] = 2*R['R']*R['P']/(R['R'] + R['P'])
     return R[['Anno', 'Pred', 'Match', 'R', 'P', 'F1']]
+    
 
-def crfpp_test(sents, model_path, para = None):
+def crfpp_test(sents, Channel_Settings, model_path, label_list):
     '''
         sents: a list of sents
     '''
-    # 0. get para
-    if not para:
-        para = [] 
-
-    label_list = [] # get the label list
     pred_entities = []
     anno_entities = []
     # here sents are a batch of sents, not necessary to be all the sents
     for sent in sents:
-        pred_SET = tagger(sent, model_path)
+        pred_SET = tagger(sent, model_path, Channel_Settings)
         pred_entities.append(pred_SET)
-        anno_SET = sent.get_SSET() # to specify
+        anno_SET = get_sent_annoSET(sent)
         anno_entities.append(anno_SET)
-
+    
+    # return anno_entities, pred_entities
     Result = match_anno_pred_result(anno_entities, pred_entities, label_list = label_list)
+    # return Result
     R = calculate_F1_Score(Result, label_list)
     return R

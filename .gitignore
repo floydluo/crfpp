@@ -2,10 +2,11 @@
 ############# MY PROJECT ###########
 pkldata/
 
-dataset/
+_tmp/
 
+_tmp/
 
-
+data/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
