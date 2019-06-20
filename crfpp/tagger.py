@@ -10,7 +10,7 @@ import pandas as pd
 from crfpp.crftools import get_sent_strfeats, crf_test
 from crfpp.evals import read_target_seq, extractSET
 
-def tagger(sent, model, Channel_Settings = None):
+def tagger(model, sent, Channel_Settings = None):
     '''
         basically from crf_test
         sent: a sentence, could be without annotation

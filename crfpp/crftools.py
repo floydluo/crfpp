@@ -55,7 +55,7 @@ learn_params  = {'-f': '2',
 
 def crf_learn(train_data_path, model_path,
               template_path  = 'template/template01',
-              crf_learn_path = 'source/crf_learn',
+              crf_learn_path = 'crfpp/source/crf_learn',
               params = learn_params):
     '''
     Use train data from `train_data_path` to learn a model and save the model to `model_path`
@@ -71,7 +71,7 @@ def crf_learn(train_data_path, model_path,
         shell_invoke(['crf_learn'] + part_args)
 
 def crf_test(test_data_path, model_path, result_path, 
-             concise = True, crf_test_path = 'source/crf_test'):
+             concise = True, crf_test_path = 'crfpp/source/crf_test'):
     '''
     Use test data from `test_data_path` and the model from `model_path` to save the result in `result_path`
     You may need to specify the concise or crf_test_path
