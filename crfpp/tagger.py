@@ -7,23 +7,25 @@ import pickle
 import numpy as np
 import pandas as pd
 
-from crftools import get_sent_strfeats, crf_test, read_target_seq, extractSET
+from crfpp.crftools import get_sent_strfeats, crf_test
+from crfpp.evals import read_target_seq, extractSET
 
-
-def tagger(sent, model_path):
+def tagger(sent, model, Channel_Settings = None):
     '''
         basically from crf_test
         sent: a sentence, could be without annotation
     '''
+    if not Channel_Settings:
+        with open(model + '/para.p', 'rb') as f:
+            Channel_Settings = pickle.load(f)
     # 1. get sentence feats
     # hopefully, the model_config is included in model_path
     feats_data_path   = '_tmp/_tagger_feats.txt'
     results_data_path = '_tmp/_tagger_results.txt'
+    model_path = model + '/model'
 
     # get Channel_Settings
     # get use sent strfeats or sent vecfeats settings
-
-    # we use get_sent_strfeats instead of get_dfsent_strfeats
     df = get_sent_strfeats(sent, Channel_Settings, train = False)
     df.to_csv(feats_data_path, sep = '\t', encoding = 'utf=8', header = False, index = False )
     # 2. save the sentence feats to a file
@@ -61,4 +63,4 @@ if __name__ == '__main__':
         help="batch name"
     )
     opts = parser.parse_args()[0]
-    tagger(model, inputPathFile, outputPathFile, batch)
+    tagger(sent, model) 

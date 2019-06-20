@@ -1,6 +1,7 @@
 # UPDATE: 2018/03/14, Add concise argument.
 # UPDATE: 2018/05/04, For Linxu.
-
+import os
+import pickle
 import numpy as np
 import pandas as pd
 from io import StringIO
@@ -9,15 +10,20 @@ console_encoding = 'gb2312'
 file_encoding = 'utf-8'
 
 
-def load_anno(channel_anno, tagScheme, BasicObject):
+def load_anno(BasicObject, anno_field):
     # channel_anno = 'annoE'
-    GU = BasicObject.getGrainUnique(channel_anno, tagScheme = tagScheme)
-    list_annoE = GU[0]
-    tag_size = len(list_annoE)
-    label_list = list(set([i.split('-')[0] for i in list_annoE if '-' in i]))
-    label_list.sort()
-    return channel_anno, tagScheme, tag_size, list_annoE, label_list
+    Channel_Settings = BasicObject.CHANNEL_SETTINGS
+    tagScheme = Channel_Settings[anno_field]['tagScheme']
+    GU = BasicObject.getGrainUnique(anno_field, tagScheme = tagScheme)
+    tags = GU[0]
+    tag_size = len(tags)
+    labels = list(set([i.split('-')[0] for i in tags if '-' in i]))
+    labels.sort()
+    return Channel_Settings, tagScheme, labels, tags, tag_size
 
+def get_model_name(BasicObject, Channel_Settings):
+    return BasicObject.TokenNum_Dir.replace('data/', 'model/') + '/' + "_".join([getChannelName(ch, style = 'abbr') 
+                                            for ch in Channel_Settings if 'anno' not in ch])
 
 def dict2list(paramdict):
     resultlist = []
@@ -43,10 +49,14 @@ def shell_invoke(args, sinput = None, soutput = None):
     return None
 
 
+learn_params  = {'-f': '2',
+                 '-c': '5.0',
+                 '-t': None}
+
 def crf_learn(train_data_path, model_path,
               template_path  = 'template/template01',
-              crf_learn_path = 'crftools/crf_learn',
-              params = {}):
+              crf_learn_path = 'source/crf_learn',
+              params = learn_params):
     '''
     Use train data from `train_data_path` to learn a model and save the model to `model_path`
     You may need to specify template_path or crf_learn_path
@@ -61,7 +71,7 @@ def crf_learn(train_data_path, model_path,
         shell_invoke(['crf_learn'] + part_args)
 
 def crf_test(test_data_path, model_path, result_path, 
-             concise = True, crf_test_path = 'crftools/crf_test'):
+             concise = True, crf_test_path = 'source/crf_test'):
     '''
     Use test data from `test_data_path` and the model from `model_path` to save the result in `result_path`
     You may need to specify the concise or crf_test_path
@@ -104,107 +114,129 @@ def get_sent_strfeats(sent, Channel_Settings, train = True):
         sent is a nlptex.sentence object
         return a pandas dataframe
     '''
-    features = {}
-    # stroke 12 and subcomp 6 are fixed internally.
-    for ch, cs in Channel_Settings.items():
-        # print(ch)
-        if 'anno' in ch and not train:
-            continue
+    try:
+        df = sent.feats
+        columns = df.columns
+        new_columns = [i for i in columns if i.split('_')[0] in Channel_Settings]
+        if not train:
+            new_columns = [i for i in new_columns if 'anno' not in i]
+        Feats = df.loc[new_columns]
+        return Feats
+    except:
+        features = {}
+        # stroke 12 and subcomp 6 are fixed internally.
+        for ch, cs in Channel_Settings.items():
+            if 'anno' in ch and not train:
+                continue
+            feature = sent.getChannelGrain(ch)
+            # this will cost a lot of time
+            if ch == 'stroke':
+                max_leng = 12
+                feature2 = []
+                for token_feat in feature:
+                    if len(token_feat) <= max_leng:
+                        feature2.append(token_feat + ['</'] * (max_leng - len(token_feat))) 
+                    else:
+                        feature2.append(token_feat[:max_leng])
+                feature = feature2
+            elif ch == 'subcomp':
+                max_leng = 6
+                feature2 = []
+                for token_feat in feature:
+                    if len(token_feat) <= max_leng:
+                        feature2.append(token_feat + ['</'] * (max_leng - len(token_feat)))
+                    else:
+                        feature2.append(token_feat[:max_leng])
+                feature = feature2 
+            features[ch] = feature
+            # print(feature)
+        L = []
+        for ch, feat in features.items():
+            df = pd.DataFrame(feat)
+            df.columns = [ch + '_' + str(i) for i in range(df.shape[1])]
+            L.append(df)
         
-        feature = sent.getChannelGrain(ch)
-        # this will cost a lot of time
-        if ch == 'stroke':
-            max_leng = 12
-            feature2 = []
-            for token_feat in feature:
-                if len(token_feat) <= max_leng:
-                    feature2.append(token_feat + ['</'] * (max_leng - len(token_feat))) 
-                else:
-                    feature2.append(token_feat[:max_leng])
-            feature = feature2
-        elif ch == 'subcomp':
-            max_leng = 6
-            feature2 = []
-            for token_feat in feature:
-                if len(token_feat) <= max_leng:
-                    feature2.append(token_feat + ['</'] * (max_leng - len(token_feat)))
-                else:
-                    feature2.append(token_feat[:max_leng])
-            feature = feature2 
-            
-        
-        features[ch] = feature
-        # print(feature)
-    L = []
-    for ch, feat in features.items():
-        L.append(pd.DataFrame(feat))
-    
-    Feats = pd.concat(L, axis = 1)
-    return Feats
-
+        Feats = pd.concat(L, axis = 1)
+        return Feats
 
 def get_sent_vecfeats(sent, Channel_Settings, fieldembed, train = True):
     return 
 
-
-def prepare_sentence_str(BasicObject):
-    sentence_path = BasicObject.TokenNum_Dir + '/' + 'Pyramid/_Feat_SENT_Str.crfpp'
+def featurize_nlptext_sentences(BasicObject, feat_type = 'str', fieldembed = None):
+    if 'str' in feat_type.lower():
+        sentence_path = BasicObject.TokenNum_Dir + '/' + 'Pyramid/_Feat_SENT_Str.crfpp'
+        get_sent_feats = get_sent_strfeats
+    elif 'vec' in feat_type.lower():
+        sentence_path = BasicObject.TokenNum_Dir + '/' + 'Pyramid/_Feat_SENT_Vec.crfpp'
+        get_sent_feats = get_sent_vecfeats
+    else:
+        print('Error! Currently there is no such a feature type')
+        
     if os.path.isfile(sentence_path):
+
         with open(sentence_path, 'rb') as handle:
             sents = pickle.load(handle)
+        print('Load Featurized Sentences from:')
+        print('\t', sentence_path)
         return sents
     else:
         from nlptext.corpus import Corpus
         corpus = Corpus() # this costs time
-        sents = [get_sent_strfeats(sent, Total_Settings) for sent in corpus.Sentences]
+        sents = []
+        for sent in corpus.Sentences:
+            sent.feats = get_sent_feats(sent, Total_Settings)
+            sents.append(sent)
         with open(sentence_path, 'wb') as handle:
             pickle.dump(sents, handle)
+        print('Save Featurized Sentences to:')
+        print('\t', sentence_path)
         return sents
-
-def prepare_sentence_vec(BasicObject):
-    sentence_path = BasicObject.TokenNum_Dir + '/' + 'Pyramid/_Feat_SENT_Vec.crfpp'
-    if os.path.isfile(sentence_path):
-        with open(sentence_path, 'rb') as handle:
-            sents = pickle.load(handle)
-        return sents
-    else:
-        from nlptext.corpus import Corpus
-        corpus = Corpus() # this costs time
-        sents = [get_sent_vecfeats(sent, BasicObject.CHANNEL_SETTINGS) for sent in corpus.Sentences]
-        with open(sentence_path, 'wb') as handle:
-            pickle.dump(sents, handle)
-        return sents
-
-
-def get_dfsent_strfeats(dfsent, Channel_Settings, train = True):
-    columns = df.columns
-    new_columns = [i for i in columns if i.split('_')[0] in Channel_Settings]
-    if not train:
-        new_columns = [i for i in new_columns if 'anno' not i in i]
-    return dfsent[new_columns]
-
-
-def get_dfsent_vecfeats(dfsent, Channel_Settings, train = True):
-    columns = df.columns
-    new_columns = [i for i in columns if i.split('_')[0] in Channel_Settings]
-    if not train:
-        new_columns = [i for i in new_columns if 'anno' not i in i]
-    return dfsent[new_columns] 
 
 ##############################################################################
 
 
 ############################################################################## generate template for derivative features
-def generate_template(gram_1 = 20, path = '_tmp/template'):
+
+individual_para = {
+    1: 3,
+    2: 2,
+    3: 1,
+}
+
+def generate_template(input_feats_num = 5, individual_para = individual_para, path = None):
     '''
-        from input feats generate derivative feats
+     this still needs more consideration
     '''
-    L = ['# Unigram\n\n']
-    for idx in range(gram_1):
-        L.append('U'  + str(idx) + ':%x[0,' + str(idx) + ']\n')
+    if not path:
+        path = '_template'
         
-    L.append('\n\n')
-    L.append('# Bigram\nB')
+    L = ['# Unigram\n\n']
+    fld_idx = 0
+    for feat_idx in range(input_feats_num):
+        for gram_num, window_size in individual_para.items():
+            if gram_num == 1:
+                for token_i in range(-window_size, window_size + 1):
+                    L.append('U{}:%x[{},{}]\n'.format(str(fld_idx), str(token_i), str(feat_idx)))
+                    fld_idx = fld_idx + 1
+            if gram_num == 2 and feat_idx <= 5:
+                for token_i in range(-window_size, window_size + 1):
+                    L.append('U{}:%x[{},{}]/%x[{},{}]\n'.format(str(fld_idx), 
+                                                                str(token_i), str(feat_idx), 
+                                                                str(token_i + 1), str(feat_idx)))
+                    fld_idx = fld_idx + 1
+                    
+            if gram_num == 3 and feat_idx <= 5:
+                for token_i in range(-window_size, window_size + 1):
+                    L.append('U{}:%x[{},{}]/%x[{},{}]/%x[{},{}]\n'.format(str(fld_idx), 
+                                                                          str(token_i - 1), str(feat_idx), 
+                                                                          str(token_i), str(feat_idx), 
+                                                                          str(token_i + 1), str(feat_idx)))
+                    fld_idx = fld_idx + 1
+    
+    
+    L.append('\n\n# Bigram\nB')
+    
     with open(path, 'w') as f:
         f.write(''.join(L))
+        
     return ''.join(L)

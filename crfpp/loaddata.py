@@ -19,14 +19,12 @@ def loadData(sents, cross_num, seed = 10, cross_validation = False, cross_idx = 
     if not cross_validation:
         test_index = random.sample(range(len(sents)), int(len(sents)/cross_num))
         test_index.sort()
-        sentTest  = [sents[idx] for idx in l]
-        sentTrain = [sents[idx] for idx in range(len(sents)) if idx not in l]
-        return sentTrain, sentTest
-
+        testSents  = [sents[idx] for idx in test_index]
+        trainSents = [sents[idx] for idx in range(len(sents)) if idx not in test_index]
+        return trainSents, testSents
     else:
-        cross_index = getCrossValidationIdx(len(typeCCT), cross_num, pad = pad)
+        cross_index = getCrossValidationIdx(len(sents), cross_num, pad = pad)
         test_index  = cross_index[cross_idx, ]
-        sentTest    = [sents[idx] for idx in test_index]
-        sentTrain   = [sents[idx] for idx in range(len(sents)) if idx not in l]
-        return sentTrain, sentTest
-
+        testSents   = [sents[idx] for idx in test_index]
+        trainSents  = [sents[idx] for idx in range(len(sents)) if idx not in test_index]
+        return trainSents, testSents

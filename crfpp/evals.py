@@ -12,6 +12,7 @@ def extractSET(tag_seq, exist_SE = False):
     '''
         SET: start, end, tag
         tag_seq: the hyper field sequence for this sentence
+
     '''
     if exist_SE:
         tag_seq = tag_seq[1:-1]
@@ -19,7 +20,7 @@ def extractSET(tag_seq, exist_SE = False):
     IT = list(zip(range(len(tag_seq)), tag_seq))
     taggedIT = [it for it in IT if it[1]!= 'O']
     
-    startIdx = [idx for idx in range(len(taggedIT)) if taggedIT[idx][1][-2:] == '-B']
+    startIdx = [idx for idx in range(len(taggedIT)) if taggedIT[idx][1][-2:] == '-B' or taggedIT[idx][1][-2:] == '-S']
     startIdx.append(len(taggedIT))
 
     entitiesList = []
@@ -32,7 +33,7 @@ def extractSET(tag_seq, exist_SE = False):
     return entitiesList
 
 
-def get_sent_annoSET(sent, channel = 'annoE', tagScheme = 'BIOES'):
+def get_sent_annoSET(sent, channel = 'annoE', tagScheme = 'BIO'):
     anno_seq = [i[0] for i in sent.getChannelGrain(channel, tagScheme=tagScheme)]
     anno_SET = extractSET(anno_seq)
     return anno_SET
@@ -42,13 +43,13 @@ def get_sent_annoSET(sent, channel = 'annoE', tagScheme = 'BIOES'):
 
 ###################################################  compare pred_SET and anno_SET
 
-def match_anno_pred_result(anno_entities, pred_entities, label_list = []):
+def match_anno_pred_result(anno_entities, pred_entities, labels = []):
     if type(anno_entities[0]) != list:
         anno_entities = [anno_entities]
         pred_entities = [pred_entities]
         
     name_list = ['E_Anno', 'E_Pred',  'E_Match']
-    for eL in label_list:
+    for eL in labels:
         name_list.extend([eL + suff for suff in ['_Anno', '_Pred', '_Match']])
     
     statistic_result = []
@@ -60,7 +61,7 @@ def match_anno_pred_result(anno_entities, pred_entities, label_list = []):
                  E_Anno  = len(anno),
                  E_Match = len(pred.intersection(anno)))
         
-        for eL in label_list:
+        for eL in labels:
             elL = [e for e in pred if eL == e[-1]]
             elA = [e for e in anno if eL == e[-1]]
             elM = set(elA).intersection(set(elL)) ## Union vs Join
@@ -73,10 +74,10 @@ def match_anno_pred_result(anno_entities, pred_entities, label_list = []):
     return Result
 
 
-def calculate_F1_Score(Result, label_list):
+def calculate_F1_Score(Result, labels):
     Result = Result.sum().to_dict()
     List = []
-    entitiesLabel = label_list + ['E']
+    entitiesLabel = labels + ['E']
     # entitiesLabel = ['Sy','Bo', 'Ch', 'Tr', 'Si'] + ['R'] + ['E']
     for eL in entitiesLabel:
         d = dict()
@@ -101,33 +102,37 @@ def calculate_F1_Score(Result, label_list):
 ################################################### log the errors between pred_SET and anno_SET
 
 def matchPaired(L, A, sent):
-    t1, start1, end1, e1 = L
-    t2, start2, end2, e2 = A
+    start1, end1, e1 = L
+    start2, end2, e2 = A
     d = {}
+    sentence = sent.sentence
     if set(range(start1, end1+1)).intersection(range(start2, end2+1)):
         idx = set(range(start1, end1+1)).union(range(start2, end2+1))
         # print()
         d['text_part'] = sent.sentence[min(idx): max(idx) + 1]
         d['start'] = min(idx)
         d['end' ]  = max(idx) 
-        d['pred'] = t1
+        d['pred'] = sent.sentence[start1: end1]
         d['pred_en'] = e1
-        d['anno'] = t2
+        d['anno'] = sent.sentence[start2: end2]
         d['anno_en'] = e2
-        d['sent_idx']= sent.idx # this is important
+        d['sent_idx']= sent.Idx # this is important
         return d
     
 def matchUnpaired(unpaired, sent, kind):
     d = {}
-    d['text_part'], d['start'], d['end' ], e = unpaired
-    d['sent_idx']= sent.idx
-    if kind == 'L':
+    sentence = sent.sentence
+    d['start'], d['end' ], e = unpaired
+    d['text_part'] = sentence[d['start']: d['end' ]]
+    d['sent_idx']= sent.Idx
+    if kind == 'P':
         d['pred'], d['pred_en'] = d['text_part'], e
         d['anno'], d['anno_en'] = None, None
     else:
         d['pred'], d['pred_en'] = None, None
         d['anno'], d['anno_en'] = d['text_part'], e
     return d
+
 
 def logError(sent, pred_entities, anno_enetities):
     log = []
@@ -142,18 +147,18 @@ def logError(sent, pred_entities, anno_enetities):
             d = matchPaired(L, A, sent)
             if d:
                 log.append(d)
-                pairedL.append(L)
+                pairedP.append(L)
                 pairedA.append(A)
                 
-    for L in [i for i in only_pred if i not in pairedL]:
-        log.append(matchUnpaired(L, sent, 'L'))
+    for L in [i for i in only_pred if i not in pairedP]:
+        log.append(matchUnpaired(L, sent, 'P'))
         
     for A in [i for i in only_anno if i not in pairedA]:
         log.append(matchUnpaired(A, sent, 'A'))
            
     if len(log) == 0:
         return pd.DataFrame()
-    cols = ['FilePath', 'Text', 'T_start', 'T_end', 'Annoted', 'AnnotET', 'Learned', 'LearnET']
-    return pd.DataFrame(log)[cols].sort_values('T_start')
+    cols = ['sent_idx', 'text_part', 'start', 'end', 'anno', 'anno_en', 'pred', 'pred_en']
+    return pd.DataFrame(log)[cols].sort_values('start')
 
 ###################################################
