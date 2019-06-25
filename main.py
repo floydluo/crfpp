@@ -1,3 +1,4 @@
+import optparse 
 from pprint import pprint
 
 from nlptext.base import BasicObject
@@ -25,12 +26,12 @@ CHANNEL_SETTINGS_TEMPLATE = {
     # CTX_IND
     'token':   {'use': True,'Max_Ngram': 1,}, # always the char-level token
     'basic':   {'use': True,'Max_Ngram': 1, 'end_grain': False},
-    'medical': {'use': False,'Max_Ngram': 1, 'end_grain': False},
-    'radical': {'use': False,'Max_Ngram': 1, 'end_grain': False},
-    'subcomp': {'use': False,'Max_Ngram': 1, 'end_grain': False},
-    'stroke':  {'use': False,'Max_Ngram': 1, 'end_grain': False},
+    'medical': {'use': True,'Max_Ngram': 1, 'end_grain': False},
+    'radical': {'use': True,'Max_Ngram': 1, 'end_grain': False},
+    'subcomp': {'use': True,'Max_Ngram': 1, 'end_grain': False},
+    'stroke':  {'use': True,'Max_Ngram': 1, 'end_grain': False},
     # CTX_DEP
-    'pos':     {'use': False, 'tagScheme': 'BIO',},
+    'pos':     {'use': True, 'tagScheme': 'BIO',},
     # ANNO
     'annoE':   {'use': True, 'tagScheme': 'BIO',},
 }
@@ -59,7 +60,7 @@ if __name__ == '__main__':
     corpus = Corpus()
     sents = corpus.Sentences
 
-    cross_num = 4
+    cross_num = 5
     cross_validation = True
     seed = 10
     train(model, sents, Channel_Settings, labels, cross_num, cross_validation = cross_validation, seed = seed)
