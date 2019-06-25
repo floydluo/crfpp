@@ -15,6 +15,7 @@ def tagger(model, sent, Channel_Settings = None):
         basically from crf_test
         sent: a sentence, could be without annotation
     '''
+    # model = model + '_' + str(cross_idx)
     if not Channel_Settings:
         with open(model + '/para.p', 'rb') as f:
             Channel_Settings = pickle.load(f)

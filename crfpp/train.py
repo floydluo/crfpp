@@ -4,6 +4,7 @@ import optparse
 import pickle
 from pprint import pprint
 from datetime import datetime
+import optparse 
 
 import pandas as pd
 import numpy as np
@@ -49,7 +50,7 @@ def crfpp_train(model, trainSents, Channel_Settings, feat_type = 'str'):
     return None
 
 
-def crfpp_test(model, testSents, Channel_Settings,  labels):
+def crfpp_test(model, testSents, Channel_Settings, labels):
     '''
         sents: a list of sents
         This function could be updated in the future for a better performance.
@@ -80,16 +81,17 @@ def crfpp_test(model, testSents, Channel_Settings,  labels):
     LogError = pd.concat(log_list).reset_index(drop = True)
     return R, LogError
 
-def trainModel(model, sentTrain, sentTest, Channel_Settings, labels):
+def trainModel(model, sentTrain, sentTest, Channel_Settings, labels, cross_idx = 0):
     '''
         sentTrain, sentTest: are featurized already.
     '''
-    log_path  = model + '/log.csv'
+    model = model + '_' + str(cross_idx)
+    log_path = model + '/log.csv'
     pfm_path = model + '/performance.csv'
     para   = crfpp_train(model, sentTrain, Channel_Settings)
     R, Err = crfpp_test (model, sentTest,  Channel_Settings, labels)
     Err.to_csv(log_path, index = False, sep = '\t')
-    R.to_csv  (pfm_path, index = False, sep = '\t')
+    R.to_csv  (pfm_path, index = True,  sep = '\t')
     # generate the error log path
     return R
 
@@ -97,19 +99,25 @@ def train(model, sents, Channel_Settings, labels, cross_num, cross_validation = 
     '''
         sent is featurized
     '''
+    total_pfm_path = model + '_performance.csv'
+
     if not cross_validation:
-        sentTrain, sentTest = loadData(sents, cross_num, seed = 10, cross_validation = cross_validation, cross_idx = 0)
+        sentTrain, sentTest = loadData(sents, cross_num, seed = seed, cross_validation = cross_validation, cross_idx = 0)
         Performance = trainModel(model, sentTrain, sentTest, Channel_Settings, labels)
         print('\nThe Final Performance is:\n')
+        print(Performance)
+        Performance.to_csv  (total_pfm_path, index = True,  sep = '\t')
         return Performance
     else:
         L = []
         for cross_idx in range(cross_num):
-            sentTrain, sentTest = loadData(sents, cross_num, seed = 10, cross_validation = cross_validation, cross_idx = cross_idx)
+            sentTrain, sentTest = loadData(sents, cross_num, seed = seed, cross_validation = cross_validation, cross_idx = cross_idx)
             print('For  ', cross_idx, '/', cross_num, "  ====")
-            R = trainModel(model, sentTrain, sentTest, Channel_Settings, labels)
+            R = trainModel(model, sentTrain, sentTest, Channel_Settings, labels, cross_idx = cross_idx)
+            print(R)
             L.append(R)
         Performance = sum(L)/cross_num
         print('\nThe Final Average Performance for', cross_num, 'Cross Validation is:\n')
         print(Performance)
+        Performance.to_csv  (total_pfm_path, index = True,  sep = '\t')
         return Performance

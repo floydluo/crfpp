@@ -5,6 +5,7 @@ import pickle
 import numpy as np
 import pandas as pd
 from io import StringIO
+from nlptext.utils.channel import getChannelName
 
 console_encoding = 'gb2312'
 file_encoding = 'utf-8'
@@ -159,7 +160,18 @@ def get_sent_strfeats(sent, Channel_Settings, train = True):
         Feats = pd.concat(L, axis = 1)
         return Feats
 
-def get_sent_vecfeats(sent, Channel_Settings, fieldembed, train = True):
+def get_sent_vecfeats(sent, fieldembed, train = True):
+    features = {}
+    Channel_Settings = fieldembed.Field_Settings
+    for ch, cs in Channel_Settings.items():
+        if 'anno' in ch and not train:
+            continue
+        derivative_wv = fieldembed.weigth[ch].derivative_wv
+        LTU = derivative_wv.LGU # LGU in derivative wv is LTU
+        token_idxes = sent.getGrainTensor('token', LTU = LTU)
+        feature = derivative_wv.vectors[token_idxes]
+        features[ch] = feature
+        # print(feature)
     return 
 
 def featurize_nlptext_sentences(BasicObject, feat_type = 'str', fieldembed = None):
@@ -218,14 +230,14 @@ def generate_template(input_feats_num = 5, individual_para = individual_para, pa
                 for token_i in range(-window_size, window_size + 1):
                     L.append('U{}:%x[{},{}]\n'.format(str(fld_idx), str(token_i), str(feat_idx)))
                     fld_idx = fld_idx + 1
-            if gram_num == 2 and feat_idx <= 5:
+            if gram_num == 2: #  and feat_idx <= 5:
                 for token_i in range(-window_size, window_size + 1):
                     L.append('U{}:%x[{},{}]/%x[{},{}]\n'.format(str(fld_idx), 
                                                                 str(token_i), str(feat_idx), 
                                                                 str(token_i + 1), str(feat_idx)))
                     fld_idx = fld_idx + 1
                     
-            if gram_num == 3 and feat_idx <= 5:
+            if gram_num == 3: #  and feat_idx <= 5:
                 for token_i in range(-window_size, window_size + 1):
                     L.append('U{}:%x[{},{}]/%x[{},{}]/%x[{},{}]\n'.format(str(fld_idx), 
                                                                           str(token_i - 1), str(feat_idx), 
