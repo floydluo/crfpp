@@ -129,7 +129,7 @@ def get_sent_strfeats(sent, Channel_Settings, train = True):
         for ch, cs in Channel_Settings.items():
             if 'anno' in ch and not train:
                 continue
-            feature = sent.getChannelGrain(ch)
+            feature = sent.get_grain_str(ch)
             # this will cost a lot of time
             if ch == 'stroke':
                 max_leng = 12
@@ -168,7 +168,7 @@ def get_sent_vecfeats(sent, fieldembed, train = True):
             continue
         derivative_wv = fieldembed.weigth[ch].derivative_wv
         LTU = derivative_wv.LGU # LGU in derivative wv is LTU
-        token_idxes = sent.getGrainTensor('token', LTU = LTU)
+        token_idxes = sent.get_grain_idx('token', LTU = LTU)
         feature = derivative_wv.vectors[token_idxes]
         features[ch] = feature
         # print(feature)
