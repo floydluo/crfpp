@@ -2,6 +2,28 @@ import random
 import time
 import numpy as np
 
+def get_train_test_valid(total_sent_num, seed = 10):
+    np.random.seed(seed)
+    train_num = int(total_sent_num*3/5)
+    test_num  = int((total_sent_num - train_num) /2)
+    valid_num = total_sent_num - train_num - test_num
+    
+    total_sent_idx = list(range(total_sent_num))
+
+    np.random.shuffle(total_sent_idx)
+
+    train_sent_idx = total_sent_idx[:train_num]
+    print('The num of train sentences:', len(train_sent_idx))
+
+    test_sent_idx = total_sent_idx[train_num:train_num + test_num]
+    print('The num of test  sentences:', len(test_sent_idx))
+
+    valid_sent_idx = total_sent_idx[train_num + test_num:]
+    print('The num of valid sentences:', len(valid_sent_idx))
+    
+    return train_sent_idx, test_sent_idx, valid_sent_idx
+
+
 def getCrossValidationIdx(length, cross_num, pad = -1):
     
     length_pad = (int(length/cross_num) + 1 ) * cross_num
@@ -28,3 +50,4 @@ def loadData(sents, cross_num, seed = 10, cross_validation = False, cross_idx = 
         testSents   = [sents[idx] for idx in test_index]
         trainSents  = [sents[idx] for idx in range(len(sents)) if idx not in test_index]
         return trainSents, testSents
+

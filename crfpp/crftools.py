@@ -15,16 +15,17 @@ def load_anno(BasicObject, anno_field):
     # channel_anno = 'annoE'
     Channel_Settings = BasicObject.CHANNEL_SETTINGS
     tagScheme = Channel_Settings[anno_field]['tagScheme']
-    GU = BasicObject.getGrainUnique(anno_field, tagScheme = tagScheme)
+    GU = BasicObject.getGrainVocab(anno_field, tagScheme = tagScheme)
     tags = GU[0]
     tag_size = len(tags)
     labels = list(set([i.split('-')[0] for i in tags if '-' in i]))
     labels.sort()
     return Channel_Settings, tagScheme, labels, tags, tag_size
 
+
 def get_model_name(BasicObject, Channel_Settings):
-    return BasicObject.TokenNum_Dir.replace('data/', 'model/') + '/' + "_".join([getChannelName(ch, style = 'abbr') 
-                                            for ch in Channel_Settings if 'anno' not in ch])
+    return BasicObject.Data_Dir.replace('data/', 'model/') + '/' + "_".join([getChannelName(ch, style = 'abbr') 
+                                            for ch in Channel_Settings])
 
 def dict2list(paramdict):
     resultlist = []
@@ -209,15 +210,16 @@ def featurize_nlptext_sentences(BasicObject, feat_type = 'str', fieldembed = Non
 
 ############################################################################## generate template for derivative features
 
+# individaul
 individual_para = {
-    1: 3,
-    2: 2,
-    3: 1,
+    1: 0,
+    # 2: 2,
+    # 3: 1,
 }
 
 def generate_template(input_feats_num = 5, individual_para = individual_para, path = None):
     '''
-     this still needs more consideration
+    this still needs more consideration
     '''
     if not path:
         path = '_template'
@@ -230,14 +232,14 @@ def generate_template(input_feats_num = 5, individual_para = individual_para, pa
                 for token_i in range(-window_size, window_size + 1):
                     L.append('U{}:%x[{},{}]\n'.format(str(fld_idx), str(token_i), str(feat_idx)))
                     fld_idx = fld_idx + 1
-            if gram_num == 2: #  and feat_idx <= 5:
+            if gram_num == 2 and feat_idx <= 5:
                 for token_i in range(-window_size, window_size + 1):
                     L.append('U{}:%x[{},{}]/%x[{},{}]\n'.format(str(fld_idx), 
                                                                 str(token_i), str(feat_idx), 
                                                                 str(token_i + 1), str(feat_idx)))
                     fld_idx = fld_idx + 1
                     
-            if gram_num == 3: #  and feat_idx <= 5:
+            if gram_num == 3 and feat_idx <= 5:
                 for token_i in range(-window_size, window_size + 1):
                     L.append('U{}:%x[{},{}]/%x[{},{}]/%x[{},{}]\n'.format(str(fld_idx), 
                                                                           str(token_i - 1), str(feat_idx), 

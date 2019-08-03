@@ -41,27 +41,3 @@ def tagger(model, sent, Channel_Settings = None):
     pred_SET = extractSET(tag_seq)
     return pred_SET
 
-if __name__ == '__main__':
-    parser = optparse.OptionParser()
-
-    parser.add_option(
-        "-m", "--model", default='1abdp',
-        help="Model name"
-    )
-
-    parser.add_option(
-        "-i", "--input", default="",
-        help="Input file location"
-    )
-
-    parser.add_option(
-        "-o", "--output", default="",
-        help="Output file location"
-    )
-
-    parser.add_option(
-        "-b", "--batch", default="ccks",
-        help="batch name"
-    )
-    opts = parser.parse_args()[0]
-    tagger(sent, model) 
