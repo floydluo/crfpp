@@ -2,9 +2,9 @@ import random
 import time
 import numpy as np
 
-def get_train_test_valid(total_sent_num, seed = 10):
+def get_train_test_valid(total_sent_num, seed = 10, prop = 0.8):
     np.random.seed(seed)
-    train_num = int(total_sent_num*3/5)
+    train_num = int(total_sent_num*prop)
     test_num  = int((total_sent_num - train_num) /2)
     valid_num = total_sent_num - train_num - test_num
     
