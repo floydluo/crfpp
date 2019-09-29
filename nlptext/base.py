@@ -141,7 +141,7 @@ class BasicObject(object):
 
         ################################################################################################################
         CorpusGroups, GroupType = CorpusGroupsReader(CORPUSPath, iden = Corpus2GroupMethod)
-        # print()
+        # print(CorpusGroups, GroupType)
         assert GROUP['GroupType'] == GroupType
         pprint(GroupType)
 
@@ -166,7 +166,9 @@ class BasicObject(object):
                 strSents = segText2Sents(strText, method = Text2SentMethod) 
 
                 # skip the sents that are empty and the sents which doesn't have annotations.
-                if len(strSents) == 0 or (anno and len(SSETText) == 0): continue
+                # if len(strSents) == 0 or (anno and len(SSETText) == 0): continue
+                if len(strSents) == 0: continue
+
                 if anno: tokenizedSents = []
                 # the following to blocks deal with multiple hyperfields (include token and annoE) for each strSent in strSents
                 # the main input are strText and strSents, (especially strSents)
@@ -262,7 +264,7 @@ class BasicObject(object):
 
                 # block1: for annotation.
                 if anno: 
-                    if SSETText == []: print('\nThe SSET of this Text is Empty!!!', '\n', strText, '\n')
+                    # if SSETText == []: print('\nThe SSET of this Text is Empty!!!', '\n', strText, '\n')
 
                     # produce the VOCAB
                     new_labels = set([sset[-1] for sset in SSETText])
@@ -729,7 +731,7 @@ class BasicObject(object):
         
         if not channel_name:
             channel_name = getChannelName(channel, Min_Ngram = Min_Ngram, Max_Ngram = Max_Ngram, end_grain = end_grain, 
-                                          min_grain_freq = min_grain_freq, tagScheme = tagScheme)
+                                          min_grain_freq = min_grain_freq)
         else:
             channel, Min_Ngram, Max_Ngram, end_grain, min_grain_freq, tagScheme = getChannelName(channel = channel, channel_name = channel_name, style = 'extract')
 

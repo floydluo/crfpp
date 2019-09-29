@@ -8,6 +8,7 @@ from datetime import datetime
 from smart_open import smart_open
 import itertools
 
+from .anno import getSSET_from_CIT
 from .infrastructure import strQ2B, fileReader, any2unicode
 
 ##################################################################################################CORPUS-FOLDER
@@ -16,7 +17,12 @@ def CorpusGroupsReader(CORPUSPath, iden = 'Dir'):
     # file is the priority
     if iden != 'Dir':
         corpusFiles = [i for i in os.listdir(CORPUSPath) if iden in i]
-        return {os.path.join(CORPUSPath, fd): '' for fd in corpusFiles}, 'File'
+        if corpusFiles == []:
+            results = [x for x in os.walk(CORPUSPath) if x[2]]
+            results = {i[0]: i[2] for i in results}
+            corpusFiles = sum([[pre + '/' + i for i in results[pre]] for pre in results], [])
+            return {fd: ''      for fd in corpusFiles}, 'File'
+        return {os.path.join(CORPUSPath, fd): ''      for fd in corpusFiles}, 'File'
     else:
         results = [x for x in os.walk(CORPUSPath) if x[2]]
         return {i[0]: i[2] for i in results}, 'Dir'
@@ -133,8 +139,13 @@ def textFileReader(folderPath, fileNames, anno = False, **kwargs):
         
         # here we process each text, and want to get strText, SSET, orig, anno
         SSETText = []
-        with open(os.path.join(folderPath, origTextName), 'r', encoding = 'utf-8') as f:
-            strText = strQ2B(f.read())
+        path = os.path.join(folderPath, origTextName)
+        with open(path, 'r', encoding = 'utf-8') as f:
+            try:
+                strText = strQ2B(f.read())
+            except:
+                strText = ''
+                print('Error in file:', path)
 
         if anno == 'annofile4text':
             SSETText, annoTextName = annofile4text(strText, folderPath, origTextName, fileNames, ORIGIden, **kwargs)
@@ -165,7 +176,41 @@ def anno_embed_in_text(line):
         SSETText.append(sset) 
     return strText, SSETText
 
-def textLineReader(folderPath, fileNames, anno = False, **kwargs):
+
+# 其实/o 非/o 汉/o 非/o 唐/o ，/o 又是/o 什么/o 与/o 什么/o 呢/o ？/o 
+anno = 'anno_embed_along_token' 
+anno_keywords = {
+    'sep_between_tokens': ' ',
+    'sep_between_token_label': '/', 
+}
+
+def anno_embed_along_token(line, **anno_keywords):
+    line = line.replace('\n', '')
+    sep_between_tokens = anno_keywords['sep_between_tokens']
+    sep_between_token_label = anno_keywords['sep_between_token_label']
+    tokenlabel_seq = line.split(sep_between_tokens)
+    tokenlabel_split_seq = [i.split(sep_between_token_label) for i in tokenlabel_seq if sep_between_token_label in i]
+    tokenlabel_split_seq = [i for i in tokenlabel_split_seq if len(i) == 2 ]
+    tokenlabel_split_seq = [i for i in tokenlabel_split_seq if i[0] != '' ]
+    # print(tokenlabel_split_seq)
+    strText = ''
+    SSETText = []
+    for tokensfrag_label in tokenlabel_split_seq:
+        try:
+            tokensfrag, label = tokensfrag_label
+        except:
+            print(tokensfrag_label)
+            continue
+        startidx = len(strText)
+        strText = strText + tokensfrag
+        endidx = len(strText)
+        if label.lower() != 'o':
+            SSETText.append([tokensfrag, startidx, endidx, label])
+
+    return strText, SSETText
+
+
+def textLineReader(folderPath, fileNames, anno = False, **anno_keywords):
     with smart_open(folderPath) as fin:
         for line in itertools.islice(fin, None):
             line = strQ2B(any2unicode(line))
@@ -173,7 +218,10 @@ def textLineReader(folderPath, fileNames, anno = False, **kwargs):
             SSETText = []
             if anno == 'anno_embed_in_text':
                 strText, SSETText = anno_embed_in_text(line)
+            elif anno == 'anno_embed_along_token':
+                strText, SSETText = anno_embed_along_token(line, **anno_keywords)
             # print(strText)
+            # print(SSETText)
             yield strText, SSETText, None, None
 
 anno = 'conll_block'
@@ -438,7 +486,7 @@ def segText2Sents(text, method = 'whole', **kwargs):
     # postprocessing
     # after this, there is no '\n' in sents
     sents = [sent.replace('\n', '').replace('\\n', '') for sent in sents]
-    sents = [sent for sent in sents if len(sent) > 5]
+    sents = [sent for sent in sents if len(sent) > 0]
     # print(sents)
     return sents
 
