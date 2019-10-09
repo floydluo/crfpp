@@ -1,8 +1,9 @@
 
 ############# MY PROJECT ###########
 pkldata/
-
+embeddings/
 _tmp/
+corpus/MedPos/
 
 _tmp/
 
