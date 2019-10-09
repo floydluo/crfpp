@@ -118,8 +118,8 @@ def match_anno_pred_result(anno_entities, pred_entities, labels = []):
             elL = [e for e in pred if eL == e[-1]]
             elA = [e for e in anno if eL == e[-1]]
             elM = set(elA).intersection(set(elL)) ## Union vs Join
-            d[eL+'@Pred'] = len(elL)
-            d[eL+'@Anno'] = len(elA)
+            d[eL+'@Pred']  = len(elL)
+            d[eL+'@Anno']  = len(elA)
             d[eL+'@Match'] = len(elM)
         
         statistic_result.append(d)
@@ -155,31 +155,30 @@ def calculate_F1_Score(Result, labels):
     return R[['Anno', 'Pred', 'Match', 'R', 'P', 'F1']]
 
 
-
 ################################################### log the errors between pred_SET and anno_SET
 def matchPaired(L, A, sent):
     start1, end1, e1 = L
     start2, end2, e2 = A
     d = {}
-    sentence = sent.sentence
+    sentence = sent.sentence.split(' ')
     if set(range(start1, end1+1)).intersection(range(start2, end2+1)):
         idx = set(range(start1, end1+1)).union(range(start2, end2+1))
         # print()
-        d['text_part'] = sent.sentence[min(idx): max(idx)]
+        d['text_part'] = ''.join(sentence[min(idx): max(idx)])
         d['start'] = min(idx)
         d['end' ]  = max(idx) 
-        d['pred'] = sent.sentence[start1: end1]
+        d['pred'] = ''.join(sentence[start1: end1])
         d['pred_en'] = e1
-        d['anno'] = sent.sentence[start2: end2]
+        d['anno'] = ''.join(sentence[start2: end2])
         d['anno_en'] = e2
         d['sent_idx']= sent.Idx # this is important
         return d
     
 def matchUnpaired(unpaired, sent, kind):
     d = {}
-    sentence = sent.sentence
+    sentence = sent.sentence.split(' ')
     d['start'], d['end' ], e = unpaired
-    d['text_part'] = sentence[d['start']: d['end' ]]
+    d['text_part'] = ''.join(sentence[d['start']: d['end' ]])
     d['sent_idx']= sent.Idx
     if kind == 'P':
         d['pred'], d['pred_en'] = d['text_part'], e

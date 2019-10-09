@@ -10,7 +10,7 @@ import pandas as pd
 from crfpp.crftools import get_sent_strfeats, crf_test
 from crfpp.evals import read_target_seq, extractSET
 
-def tagger(model, sent, Channel_Settings = None):
+def tagger(model, sent, Channel_Settings = None, get_seq = False, get_entities = True):
     '''
         basically from crf_test
         sent: a sentence, could be without annotation
@@ -37,7 +37,9 @@ def tagger(model, sent, Channel_Settings = None):
     # 4. read and parse the result to pred_SSET
     # get a tag_seq
     # list of tuple (score, result)
+
     tag_seq  = read_target_seq(results_data_path)
+    if get_seq: return tag_seq
     pred_SET = extractSET(tag_seq)
     return pred_SET
 
