@@ -1,9 +1,10 @@
 import optparse 
 import pickle
 from pprint import pprint
-
+import os
 from nlptext.base import BasicObject
 from nlptext.corpus import Sentence
+import shutil
 
 from crfpp.crftools import load_anno, get_model_name
 from crfpp.train import crfpp_train, crfpp_test
@@ -23,13 +24,14 @@ BasicObject.INIT_FROM_PICKLE(Data_Dir)
 FIELD_SETTINGS_TEMPLATE = {
     # CTX_IND
     'token':   {'use': True, 'Max_Ngram': 1,}, # always the char-level token
-    'basic':   {'use': False, 'Max_Ngram': 1, 'end_grain': False},
-    'medical': {'use': False, 'Max_Ngram': 1, 'end_grain': False},
-    'radical': {'use': False, 'Max_Ngram': 1, 'end_grain': False},
+    'basic':   {'use': True, 'Max_Ngram': 1, 'end_grain': False},
+    'medical': {'use': True, 'Max_Ngram': 1, 'end_grain': False},
+    'radical': {'use': True, 'Max_Ngram': 1, 'end_grain': False},
     'subcomp': {'use': False,'Max_Ngram': 1, 'end_grain': False},
     'stroke':  {'use': False,'Max_Ngram': 1, 'end_grain': False},
     # CTX_DEP
-    'pos':     {'use': False, 'tagScheme': 'BIOES',},
+    'pos':     {'use': True, 'tagScheme': 'BIOES',},
+    'medpos':  {'use': False, 'tagScheme': 'BIOES',},
     # ANNO
     'annoE':   {'use': True, 'tagScheme': 'BIOES',},
 }
@@ -66,7 +68,18 @@ if __name__ == '__main__':
     print('The model path is:')
     print('\t', model)
 
-    
+    if not os.path.exists(model): 
+        os.makedirs(model)
+        # with open(model + '/seqrepr.txt', 'w', encoding = 'utf-8') as f:
+        #     f.write(FldSeq_Dir)
+        # with open(ModelPath + '/seqrepr_config.json', 'w', encoding = 'utf-8') as f:
+        #     json.dump(FldSeq_Para, f, indent = 4)
+    elif os.path.exists(model):
+        shutil.rmtree(model)
+        os.makedirs(model)
+    else:
+        pass # TODO
+ 
     para_path = model + '/para.p'
     with open(para_path, 'wb') as handle:
         pickle.dump(Channel_Settings, handle )
