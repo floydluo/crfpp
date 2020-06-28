@@ -65,13 +65,14 @@ def crfpp_test(model, testSents, Channel_Settings, labels):
             print(datetime.now(), idx)
         # 200/13s
         pred_SET = tagger(model, sent, Channel_Settings = Channel_Settings)
-        pred_entities.append(pred_SET)
-        
         anno_SET = get_sent_annoSET(sent)
-        anno_entities.append(anno_SET)
-        
         error = logErrors(sent, pred_SET, anno_SET)
         log_list.append(error)
+
+        pred_entities.append(pred_SET)
+        anno_entities.append(anno_SET)
+
+
     # return anno_entities, pred_entities
     Result = match_anno_pred_result(anno_entities, pred_entities, labels = labels)
     # return Result
